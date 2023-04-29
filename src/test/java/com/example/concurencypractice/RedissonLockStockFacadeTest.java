@@ -36,7 +36,7 @@ public class RedissonLockStockFacadeTest {
 
     @Test
     public void requests_100_AtTheSameTime() throws InterruptedException {
-        int threadCount = 5;
+        int threadCount = 100;
         ExecutorService executorService = Executors.newFixedThreadPool(32);
 
         CountDownLatch latch = new CountDownLatch(threadCount);

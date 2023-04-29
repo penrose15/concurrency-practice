@@ -13,6 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -39,23 +40,20 @@ public class LettuceLockStockFacadeTest {
 
     @Test
     public void requests_100_AtTheSameTime() throws InterruptedException {
-        int threadCount = 20;
+        int threadCount = 100;
         ExecutorService executorService = Executors.newFixedThreadPool(32);
 
         CountDownLatch latch = new CountDownLatch(threadCount);
 
-        for (int i = 0; i < threadCount; i++) {
-            executorService.submit(() -> {
-                try {
-                    lettuceLockStockFacade.decrease(1L, 1L);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                } finally {
-                            latch.countDown();
-                        }
-                    }
-            );
-        }
+        IntStream.range(0, threadCount).forEach(e -> executorService.submit(() ->{
+            try {
+                lettuceLockStockFacade.decrease(1L, 1L);
+            } catch (InterruptedException ex) {
+                throw new RuntimeException(ex);
+            } finally {
+                latch.countDown();
+            }
+        }));
 
         latch.await();
 
