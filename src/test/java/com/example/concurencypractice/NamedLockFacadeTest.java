@@ -1,10 +1,12 @@
 package com.example.concurencypractice;
 
 import com.example.concurencypractice.domain.Stock;
+import com.example.concurencypractice.facade.NamedLockFacade;
+import com.example.concurencypractice.repository.LockRepository;
 import com.example.concurencypractice.repository.StockRepository;
-import com.example.concurencypractice.service.StockService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -16,16 +18,19 @@ import java.util.concurrent.Executors;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
-public class StockServiceTest {
+public class NamedLockFacadeTest {
 
     @Autowired
-    private StockService stockService;
+    private NamedLockFacade namedLockFacade;
 
     @Autowired
     private StockRepository stockRepository;
 
+    @Autowired
+    private LockRepository lockRepository;
+
     @BeforeEach
-    public void init() {
+    public void before() {
         Stock stock = new Stock(1L, 100L);
         stockRepository.saveAndFlush(stock);
     }
@@ -36,27 +41,25 @@ public class StockServiceTest {
     }
 
     @Test
-    public void 동시에_100개의_요청() throws InterruptedException {
+    @DisplayName("Pessimistic LOCK 동시에 100개의 요청")
+    public void Pessimistic_request_100_AtTheSameTime() {
         int threadCount = 100;
-        //multiThread 이용 ExecutorService : 비동기를 단순하게 처리할 수 있도록 해주는 자바 api
-        ExecutorService executorService =
-                Executors.newFixedThreadPool(32);
+        ExecutorService executorService = Executors.newFixedThreadPool(32);
 
-        //다른 쓰레드에서 수행이 완로될 때 까지 대기할 수 있도록 도와주는 API로 요청이 끝날 때까지 기다린다.
         CountDownLatch latch = new CountDownLatch(threadCount);
 
         for(int i = 0; i<threadCount; i++) {
             executorService.submit(() -> {
                 try {
-                    stockService.decrease(1L, 1L);
+                    namedLockFacade.decrease(1L, 1L);
                 } finally {
                     latch.countDown();
                 }
             });
-        }
-        latch.await();
-        Stock stock = stockRepository.findById(1L).orElseThrow();
+            Stock stock = stockRepository.findById(1L).orElseThrow();
 
-        assertThat(stock.getQuantity()).isEqualTo(0L);
+            assertThat(stock.getQuantity())
+                    .isEqualTo(0L);
+        }
     }
 }

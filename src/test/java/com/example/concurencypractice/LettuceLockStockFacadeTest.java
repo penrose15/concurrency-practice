@@ -1,10 +1,11 @@
 package com.example.concurencypractice;
 
 import com.example.concurencypractice.domain.Stock;
+import com.example.concurencypractice.facade.LettuceLockStockFacade;
 import com.example.concurencypractice.repository.StockRepository;
-import com.example.concurencypractice.service.StockService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -16,17 +17,17 @@ import java.util.concurrent.Executors;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
-public class StockServiceTest {
+public class LettuceLockStockFacadeTest {
 
     @Autowired
-    private StockService stockService;
+    private LettuceLockStockFacade lettuceLockStockFacade;
 
     @Autowired
     private StockRepository stockRepository;
 
     @BeforeEach
-    public void init() {
-        Stock stock = new Stock(1L, 100L);
+    public void before() {
+        Stock stock = new Stock(1L, 20L);
         stockRepository.saveAndFlush(stock);
     }
 
@@ -35,26 +36,29 @@ public class StockServiceTest {
         stockRepository.deleteAll();
     }
 
-    @Test
-    public void 동시에_100개의_요청() throws InterruptedException {
-        int threadCount = 100;
-        //multiThread 이용 ExecutorService : 비동기를 단순하게 처리할 수 있도록 해주는 자바 api
-        ExecutorService executorService =
-                Executors.newFixedThreadPool(32);
 
-        //다른 쓰레드에서 수행이 완로될 때 까지 대기할 수 있도록 도와주는 API로 요청이 끝날 때까지 기다린다.
+    @Test
+    public void requests_100_AtTheSameTime() throws InterruptedException {
+        int threadCount = 20;
+        ExecutorService executorService = Executors.newFixedThreadPool(32);
+
         CountDownLatch latch = new CountDownLatch(threadCount);
 
-        for(int i = 0; i<threadCount; i++) {
+        for (int i = 0; i < threadCount; i++) {
             executorService.submit(() -> {
                 try {
-                    stockService.decrease(1L, 1L);
+                    lettuceLockStockFacade.decrease(1L, 1L);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
                 } finally {
-                    latch.countDown();
-                }
-            });
+                            latch.countDown();
+                        }
+                    }
+            );
         }
+
         latch.await();
+
         Stock stock = stockRepository.findById(1L).orElseThrow();
 
         assertThat(stock.getQuantity()).isEqualTo(0L);
